@@ -1,0 +1,99 @@
+.nodeCard {
+  position: absolute;
+  right: 14px;
+  top: 14px;
+  width: 340px;
+  max-height: calc(100% - 28px);
+  overflow: auto;
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  border-radius: 14px;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+  backdrop-filter: blur(10px);
+}
+
+.nodeCardHeader {
+  padding: 12px 12px 10px 12px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.nodeTitle {
+  font-weight: 700;
+  color: #0f172a;
+  font-size: 14px;
+}
+
+.nodeSub {
+  margin-top: 2px;
+  font-size: 12px;
+  color: rgba(15, 23, 42, 0.6);
+}
+
+.iconBtn {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  background: #ffffff;
+  cursor: pointer;
+}
+
+.nodeMeta {
+  padding: 10px 12px 0 12px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.pill {
+  font-size: 11px;
+  padding: 6px 8px;
+  border-radius: 999px;
+  background: rgba(248, 250, 252, 0.9);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  color: rgba(15, 23, 42, 0.7);
+}
+
+.nodeRows {
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 120px 1fr;
+  gap: 10px;
+  font-size: 12px;
+}
+
+.k {
+  color: rgba(15, 23, 42, 0.65);
+  font-weight: 600;
+}
+
+.v {
+  color: rgba(15, 23, 42, 0.85);
+  word-break: break-word;
+}
+
+.nodeActions {
+  padding: 12px;
+  border-top: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.btn {
+  width: 100%;
+  height: 38px;
+  border-radius: 10px;
+  border: none;
+  background: #2563eb;
+  color: #ffffff;
+  font-weight: 650;
+  cursor: pointer;
+}
+
