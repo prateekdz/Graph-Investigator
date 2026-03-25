@@ -52,13 +52,22 @@ Graph Investigator models these relationships explicitly and provides an interfa
   - Chat pipeline: `POST /api/ask` (policy-controlled query execution with fallback)
   - Storage: Neo4j primary + deterministic file dataset fallback
 
+### Architecture decisions (and why)
+
+This system is optimized for analyst workflows: fast pivots, high trust, bounded cost.
+
+- **Graph-first UI:** O2C questions are path/traversal questions. A graph canvas makes relationships inspectable without manual joins.
+- **Neo4j as the primary DB (optional):** multi-hop traversals map naturally to Cypher and perform predictably on relationship-heavy datasets.
+- **File fallback as a first-class mode:** deployment and onboarding should not require a database; the backend can serve the same UI contract from the dataset directory.
+- **Evidence-first chat:** chat is a query-and-evidence interface, not open-ended generation; it returns structured answers plus highlights back to graph context.
+
 ### Data model (O2C)
 
 Primary entities:
 
 `Customer → Order → Delivery → Invoice → Payment → JournalEntry`
 
-Stable addressing uses `entityType` + `entityId` (e.g., `Invoice:91150187`).
+Stable addressing uses `entityType` + `entityId` (for example: `Invoice:91150187`).
 
 ### Data flow
 
@@ -68,6 +77,25 @@ Stable addressing uses `entityType` + `entityId` (e.g., `Invoice:91150187`).
 4. **Chat ask** → `POST /api/ask`
    - Neo4j reachable: optional NL → query plan → read-only execution → evidence-first answer
    - Neo4j unreachable: deterministic dataset-backed lookup with real examples and highlights
+
+---
+
+## Database choice
+
+### Why Neo4j
+
+- O2C analysis frequently requires multi-hop traversals (invoice → payments → journal entries), neighborhood inspection, and relationship typing.
+- Cypher expresses these traversals directly, reducing application-side join logic and simplifying system maintenance for path-centric workflows.
+
+### Why file fallback
+
+- Some environments won’t have Neo4j available (local reviews, minimal deployments).
+- Fallback mode keeps the product usable and deterministic by building an in-memory graph from `DATA_DIR` while preserving the same API contracts.
+
+### Trade-offs
+
+- Neo4j enables traversal-heavy investigations with predictable performance but introduces operational overhead.
+- File fallback is easy to deploy and deterministic but does not match Neo4j for large-scale ad hoc traversal workloads.
 
 ---
 
@@ -87,6 +115,62 @@ Stable addressing uses `entityType` + `entityId` (e.g., `Invoice:91150187`).
    - `highlights` (entity ids to focus in the graph)
    - `blocks` (evidence/query blocks rendered by chat)
    - `suggestions` (next actions for continued tracing)
+
+---
+
+## LLM prompting strategy
+
+The LLM integration is designed as a **planning step** with strict post-validation—not an open-ended responder.
+
+### 1) Plan generation (NL → query plan)
+
+The backend prompts the model to return **JSON only**, typically:
+
+- `language`: `cypher` (or `sql` when enabled)
+- `query`: a single read-only query
+- `params`: parameter values (no string concatenation)
+
+Prompts are schema-aware and biased towards:
+
+- stable identifiers (`entityType:entityId`)
+- bounded result sets
+- predictable shapes for UI rendering (highlights + evidence blocks)
+
+### 2) Execution (read-only)
+
+Plans are executed only if they pass guardrails. When execution is not possible (Neo4j down), the system falls back to deterministic dataset lookup.
+
+### 3) Answer synthesis (results → narrative)
+
+When query results exist, the model is prompted to produce an analyst-friendly response:
+
+- headings and bullets
+- bolded identifiers
+- short relationship explanation
+- optional next actions
+
+For auditability, the UI can also disclose the executed query as a chat “query block.”
+
+---
+
+## Guardrails and safety controls
+
+### Query guardrails
+
+- **Read-only enforcement:** write operations are rejected.
+- **Schema allowlists:** only dataset-relevant labels/relationships are permitted.
+- **Cost bounds:** `LIMIT` clamps and execution timeouts prevent unbounded queries.
+- **Procedure restrictions:** blocks risky functionality (for example, procedure calls) in generated queries.
+
+### Grounding guarantees (no hallucination)
+
+- If the system cannot safely execute a query, it returns deterministic dataset-backed results (or “not found” plus real examples).
+- Chat responses include `highlights` to anchor the narrative to specific graph nodes.
+
+### Degraded-mode behavior
+
+- **Neo4j unreachable:** `POST /api/ask` falls back immediately and still returns `answer`, `highlights`, `blocks`, and `suggestions`.
+- **LLM unavailable/invalid key:** the system skips LLM steps and uses deterministic dataset search instead.
 
 ---
 
@@ -203,11 +287,6 @@ Graph usage:
 - **Cost control:** query safety includes LIMIT clamps and timeouts.
 - **UI focus:** selection-based highlighting reduces cognitive load and rendering overhead.
 
-Trade-offs:
-
-- Neo4j adds operational overhead but enables traversal-heavy investigations with predictable performance.
-- File fallback is deterministic and easy to deploy, but does not match Neo4j for large-scale traversals.
-
 ---
 
 ## Future Improvements
@@ -228,3 +307,4 @@ Contributions are welcome. Keep changes dataset-grounded, maintain read-only saf
 ## License
 
 MIT
+
