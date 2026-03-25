@@ -1,105 +1,159 @@
-# O2C Graph Investigator
+# Graph Investigator
 
-Graph-first exploration and dataset-grounded chat for SAP-style **Order-to-Cash (O2C)** data.
+**Graph Investigator** is a dataset-grounded investigation console for SAP-style Order-to-Cash (O2C) data—combining a high-signal graph view with evidence-first chat.
 
-This project supports a production-oriented analyst workflow:
+**One-line value:** trace O2C entities end-to-end, pivot across relationships instantly, and keep every answer anchored to the dataset.
 
-- Explore a relationship-heavy dataset as an interactive graph.
-- Ask questions that translate into **read-only queries** under strict policy controls.
-- Highlight referenced entities to keep investigations focused and navigable.
+---
 
-## Product surfaces
+## Overview
 
-- **Graph canvas:** pan/zoom, selection focus, neighborhood highlighting.
-- **Chat sidebar:** structured answers, optional executed-query disclosure, actionable suggestions.
-- **Floating record card:** compact, field/value layout for the selected entity.
+Order-to-Cash data is inherently graph-shaped: orders, deliveries, invoices, payments, and journal entries form multi-hop chains with frequent splits and many-to-many joins. Table-first workflows make path tracing slow and error-prone.
 
-## Screenshots
+Graph Investigator models these relationships explicitly and provides an interface optimized for:
 
-Place screenshots in `screenshots/`:
+- **Tracing:** follow multi-hop paths without manual joins.
+- **Context expansion:** inspect neighborhoods (neighbors, relationships, degree) on demand.
+- **Evidence-first answers:** responses are generated from query results or deterministic dataset lookup—**no dataset hallucination**.
 
-- `screenshots/dashboard.png` — Full dashboard: graph + chat + floating record card.
-- `screenshots/graph.png` — Investigation focus: selection + floating record details.
-- `screenshots/chat.png` — Structured answer with evidence blocks and “Open” pivots.
+---
 
-![Dashboard](screenshots/dashboard.png)
+## Key Features
 
-![Graph + Detail Card](screenshots/graph.png)
+### Graph investigation
 
-![Chat + Evidence](screenshots/chat.png)
+- Pan/zoom canvas with thin-edge, low-noise styling
+- Selection focus: highlight the neighborhood and fade irrelevant context
+- Floating record card with compact label/value layout for rapid scanning
 
-## Architecture
+### Evidence-first chat
 
-### Frontend (React)
+- Structured responses (headings + bullets) with actionable follow-ups
+- Evidence blocks (record cards + optional executed-query disclosure)
+- Entity highlighting: nodes referenced in answers are highlighted in the graph
 
-- Vite + Tailwind CSS
-- `react-force-graph-2d` for the graph visualization
-- Chat and record surfaces designed for fast investigation pivots
+### Dual-mode data access (Neo4j + file fallback)
 
-### Backend (Node/Express)
+- **Neo4j mode:** traversal-heavy queries (Cypher) for deep investigations
+- **File fallback mode:** deterministic operation without Neo4j; graph browsing + search + evidence cards still work
 
-- REST API:
-  - `GET /health`
-  - `GET /api/graph`
-  - `GET /api/node/:id`
-  - `GET /api/search?q=...`
-  - `POST /api/ask`
-- Storage modes:
-  - **Neo4j** (primary, for traversals)
-  - **File dataset fallback** (deterministic local/prod runs without Neo4j)
+---
 
-### Graph model (O2C)
+## System Architecture
 
-Primary entity types:
+### Components
 
-- `Customer`, `Order`, `Delivery`, `Invoice`, `Payment`, `JournalEntry`
+- **Frontend (React/Vite/Tailwind)**
+  - Graph canvas: `react-force-graph-2d`
+  - Chat sidebar: structured answers + evidence blocks + “Open” pivots
+  - Floating detail card for the selected entity
+- **Backend (Node/Express)**
+  - Graph APIs: `GET /api/graph`, `GET /api/node/:id`, `GET /api/search?q=...`
+  - Chat pipeline: `POST /api/ask` (policy-controlled query execution with fallback)
+  - Storage: Neo4j primary + deterministic file dataset fallback
 
-Typical flow:
+### Data model (O2C)
+
+Primary entities:
 
 `Customer → Order → Delivery → Invoice → Payment → JournalEntry`
 
-## Data flow (chat lifecycle)
+Stable addressing uses `entityType` + `entityId` (e.g., `Invoice:91150187`).
 
-1. User asks a question in chat.
-2. Backend attempts **NL → query plan** (LLM, optional).
-3. Policy enforcement:
-   - read-only validation
-   - dataset-only schema allowlists
-   - LIMIT clamp + timeout
-4. Execution:
-   - Neo4j (Cypher) or file-backed fallback when Neo4j is unavailable
-5. Response:
-   - structured answer
-   - highlights for graph focus
-   - optional executed-query block
+### Data flow
 
-## Repository layout
+1. **Graph load** → `GET /api/graph` returns `{ nodes, links }` (Neo4j or file fallback)
+2. **Node select** → `GET /api/node/:id` returns node + neighbors + edges for the detail card
+3. **Search** → `GET /api/search?q=...` resolves entity + id and returns the matching record and subgraph
+4. **Chat ask** → `POST /api/ask`
+   - Neo4j reachable: optional NL → query plan → read-only execution → evidence-first answer
+   - Neo4j unreachable: deterministic dataset-backed lookup with real examples and highlights
 
-```
-backend/
-  src/                 # Express app (Neo4j + fallback APIs)
-  services/            # file-backed graph store and parsing
-  scripts/             # importer utilities
+---
 
-frontend/
-  src/components/      # dashboard UI building blocks
-  src/pages/           # page composition + data wiring
-  src/api/             # API base config
+## Core Workflows
 
-data/                  # SAP O2C dataset
-screenshots/           # screenshots referenced in this README
-```
+### Graph interaction
 
-## Local development
+1. Click a node in the graph.
+2. The UI fetches details and opens a floating card (field/value pairs).
+3. The neighborhood is highlighted; unrelated context is faded for clarity.
+
+### Chat → dataset → response
+
+1. Ask for an entity/id (example: `Find invoice 91150187`).
+2. Backend returns:
+   - `answer` (structured text)
+   - `highlights` (entity ids to focus in the graph)
+   - `blocks` (evidence/query blocks rendered by chat)
+   - `suggestions` (next actions for continued tracing)
+
+---
+
+## Tech Stack
+
+**Frontend**
+- React, Vite, Tailwind CSS
+- `react-force-graph-2d`, `framer-motion`
+
+**Backend**
+- Node.js, Express, `cors`, `dotenv`
+
+**Data**
+- SAP O2C dataset loader (file-backed graph store)
+- Neo4j (optional, Bolt)
+
+**Infra**
+- Frontend: Vercel
+- Backend: Render
+
+---
+
+## Design Principles
+
+- **Dataset integrity:** no fabricated records; answers come from results or deterministic fallback search.
+- **Read-only by default:** query execution is constrained (read-only policy, schema allowlists, limit clamp, timeouts).
+- **Minimal surface area:** progressive disclosure over dense controls; default workflows require few clicks.
+- **Performance-aware UI:** highlight/fade behavior keeps focus on the current investigation slice.
+
+---
+
+## UI/UX Philosophy
+
+Designed for analyst-grade workflows:
+
+- **Visual hierarchy:** graph is the primary surface; chat provides narrative + evidence and guides next actions.
+- **Fast pivots:** evidence blocks include “Open” actions to jump to the right context instantly.
+- **Compact density:** modern B2B SaaS layout optimized for laptops (more signal, less chrome).
+
+---
+
+## Screenshots
+
+**Dashboard** — graph canvas + chat sidebar with enterprise spacing and a compact header.
+
+![Dashboard](screenshots/dashboard.png)
+
+**Graph + Detail Card** — node selection opens a floating record card and focuses the neighborhood.
+
+![Graph + Detail Card](screenshots/graph.png)
+
+**Chat + Evidence** — structured response with evidence blocks and an “Open” pivot.
+
+![Chat + Evidence](screenshots/chat.png)
+
+---
+
+## Installation
 
 Prerequisites:
 
 - Node.js 18+
-- (Optional) Neo4j running with Bolt enabled
+- (Optional) Neo4j with Bolt enabled
 
 ### Backend
 
-```
+```bash
 cd backend
 npm install
 npm start
@@ -107,67 +161,69 @@ npm start
 
 Health check:
 
-```
+```text
 http://localhost:4000/health
 ```
 
-Neo4j is optional. For file-only mode, set:
-
-- `NEO4J_DISABLED=1`
-
 ### Frontend
 
-```
+```bash
 cd frontend
 npm install
 npm run dev
 ```
 
-Configure the backend URL (optional):
+Configure backend URL (optional):
 
-- `frontend/.env` → `VITE_API_BASE_URL=http://localhost:4000`
+```bash
+# frontend/.env
+VITE_API_BASE_URL=http://localhost:4000
+```
 
-## Deployment (Vercel + Render)
+---
 
-### Frontend → Vercel
+## Usage
 
-1. Import this repo in Vercel.
-2. Set **Root Directory** to `frontend/`.
-3. Build settings:
-   - Build Command: `npm run build`
-   - Output Directory: `dist`
-4. Environment variables:
-   - `VITE_API_BASE_URL=https://<your-backend>.onrender.com`
+Example prompts:
 
-### Backend → Render
+- `Find invoice 91150187`
+- `Get order 740509`
+- `Show journal entry for 91150187`
 
-1. Create a **Web Service** in Render.
-2. Set **Root Directory** to `backend/`.
-3. Build Command: `npm ci`
-4. Start Command: `npm start`
-5. Environment variables (minimum):
-   - `NEO4J_DISABLED=1` (recommended unless you provision Neo4j)
-   - `DATA_DIR=../data/sap-order-to-cash/sap-o2c-data`
-   - `CORS_ORIGIN=https://<your-frontend>.vercel.app`
-6. (Optional LLM):
-   - `LLM_PROVIDER=gemini` + `GEMINI_API_KEY=...`
-   - or `LLM_PROVIDER=groq` + `GROQ_API_KEY=...`
+Graph usage:
 
-Render provides `PORT` automatically; the backend binds to `process.env.PORT`.
+- Click any node to open the detail card.
+- Use chat “Open” actions to pivot to related entities.
 
-## Environment variables
+---
 
-Use the provided examples:
+## Scalability & Performance
 
-- `backend/.env.example`
-- `frontend/.env.example`
+- **Graph payload control:** backend bounds responses to avoid unbounded edge sets.
+- **Cost control:** query safety includes LIMIT clamps and timeouts.
+- **UI focus:** selection-based highlighting reduces cognitive load and rendering overhead.
 
-Do not commit secrets (API keys, DB passwords). Use Vercel/Render environment settings.
+Trade-offs:
 
-## Operational notes
+- Neo4j adds operational overhead but enables traversal-heavy investigations with predictable performance.
+- File fallback is deterministic and easy to deploy, but does not match Neo4j for large-scale traversals.
 
-- If Neo4j is down/unreachable, the app continues to function using the file dataset fallback.
-- `POST /api/ask` never “hallucinates” dataset facts: it either executes a read-only query or falls back to deterministic dataset lookup.
+---
+
+## Future Improvements
+
+- Streaming responses (SSE) for chat to improve perceived latency
+- Incremental neighborhood expansion (N hops, relationship filters)
+- Saved investigations (shareable links + reproducible query context)
+- Indexing/caching strategies for larger datasets and repeated pivots
+
+---
+
+## Contributing
+
+Contributions are welcome. Keep changes dataset-grounded, maintain read-only safety controls, and preserve the minimal investigation workflow.
+
+---
 
 ## License
 
