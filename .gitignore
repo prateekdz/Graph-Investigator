@@ -1,0 +1,26 @@
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Logs and temp files
+*.log
+*.tmp
+*.out
+*.err
+
+# Local docs/artifacts not meant for repo
+AI_Workflow.md
+AI_Workflow_Submission.zip
+ai_coding_session_logs.md
+httpsclaude.aisharea259ee27-0a50-45.txt
+render.yaml
+
+# Dependencies / builds
+**/node_modules/
+**/dist/
+
+# Environment
+**/.env
+**/.env.*
